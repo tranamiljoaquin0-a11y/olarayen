@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Te quiero, Rayen 💌</title>
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600;700&family=Lato:wght@300;400&display=swap" rel="stylesheet" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      background: #f7c3c3;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Lato', sans-serif;
+      overflow: hidden;
+    }
+
+    /* ─────────────────────────────────────────────
+       PARTICLE LAYER
+    ───────────────────────────────────────────── */
+    #particles {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 200;
+      overflow: hidden;
+    }
+
+    .particle {
+      position: absolute;
+      line-height: 1;
+      will-change: transform, opacity;
+      animation: drift ease-out forwards;
+      opacity: 0;
+    }
+
+    @keyframes drift {
+      0%   { transform: translate(0, 0) scale(.3) rotate(0deg); opacity: 0; }
+      15%  { opacity: 1; }
+      100% { transform: translate(var(--tx), var(--ty)) scale(1) rotate(var(--rot)); opacity: 0; }
+    }
+
+    /* ─────────────────────────────────────────────
+       SCENE
+    ───────────────────────────────────────────── */
+    .scene {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 36px;
+    }
+
+    /* ─────────────────────────────────────────────
+       PERSPECTIVE WRAPPER
+       Explicit size = envelope size so absolute
+       children line up perfectly.
+       NO z-index here → perspective propagates to
+       .top-flap without being broken by a stacking
+       context.
+    ───────────────────────────────────────────── */
+    .env-perspective {
+      position: relative;
+      width: 280px;
+      height: 180px;
+      perspective: 700px;
+      perspective-origin: 50% 0%;
+    }
+
+    /* ─────────────────────────────────────────────
+       LETTER  — DOM ORDER: first → naturally below .envelope
+       Starts invisible (opacity 0, no z-index).
+       .emerge       → moves up + becomes visible, gets z-index 20
+       .text-visible → inner content fades in
+    ───────────────────────────────────────────── */
+    .letter {
+      position: absolute;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%) translateY(0);
+      width: 218px;
+      height: 138px;
+      background: #fff8f6;
+      border-radius: 2px;
+      box-shadow: 0 2px 14px rgba(0,0,0,.12);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      /* Hidden until JS adds .emerge */
+      opacity: 0;
+      /* Transitions driven by JS timing, no CSS delay */
+      transition:
+        transform .95s cubic-bezier(.34, 1.4, .64, 1),
+        opacity   .3s  ease;
+    }
+
+    /* Phase 2 – letter rises and becomes visible */
+    .letter.emerge {
+      transform: translateX(-50%) translateY(-150px);
+      opacity: 1;
+      z-index: 20;  /* now above the envelope body */
+    }
+
+    /* Inner content: rendered but invisible until Phase 3 */
+    .letter-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      opacity: 0;
+      transition: opacity .55s ease;
+    }
+
+    /* Phase 3 – text fades in once letter is fully out */
+    .letter.text-visible .letter-content {
+      opacity: 1;
+    }
+
+    .letter-text {
+      font-family: 'Dancing Script', cursive;
+      font-size: clamp(1.25rem, 4.5vw, 1.55rem);
+      color: #c0392b;
+      text-align: center;
+      line-height: 1.55;
+      padding: 0 12px;
+    }
+
+    .letter-decoration {
+      display: flex;
+      gap: 6px;
+      font-size: .9rem;
+      color: #e05050;
+      opacity: .65;
+    }
+
+    .letter-line {
+      width: 68%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, #f0b0b0, transparent);
+    }
+
+    /* ─────────────────────────────────────────────
+       ENVELOPE BODY  — DOM ORDER: second → naturally above .letter
+       position: absolute fills the perspective wrapper.
+       NO explicit z-index → no stacking context created
+       → perspective from parent still reaches .top-flap.
+    ───────────────────────────────────────────── */
+    .envelope {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: #f9c5c8;
+      box-shadow: 0 6px 28px rgba(180, 80, 80, .22);
+      overflow: visible;
+    }
+
+    /* Darker interior visible once flap lifts */
+    .env-inside {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(170deg, #dfa0a8 0%, #f2b4ba 100%);
+      z-index: 1;
+    }
+
+    /* Decorative front fold lines */
+    .fold-bl {
+      position: absolute;
+      bottom: 0; left: 0;
+      width: 0; height: 0;
+      border-style: solid;
+      border-width: 0 0 90px 140px;
+      border-color: transparent transparent rgba(200,100,115,.16) transparent;
+      z-index: 2;
+    }
+    .fold-br {
+      position: absolute;
+      bottom: 0; right: 0;
+      width: 0; height: 0;
+      border-style: solid;
+      border-width: 0 140px 90px 0;
+      border-color: transparent rgba(200,100,115,.16) transparent transparent;
+      z-index: 2;
+    }
+
+    /* ─────────────────────────────────────────────
+       TOP FLAP  — red triangle, 3-D opens upward
+    ───────────────────────────────────────────── */
+    .top-flap {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      clip-path: polygon(0 0, 100% 0, 50% 56%);
+      background: linear-gradient(155deg, #e63946 0%, #c0292f 100%);
+      transform-origin: top center;
+      transform: rotateX(0deg);
+      transition: transform .88s cubic-bezier(.4, 0, .2, 1);
+      z-index: 10;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+    }
+
+    .top-flap::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to bottom, rgba(255,255,255,.14) 0%, rgba(0,0,0,.06) 100%);
+    }
+
+    /* Phase 1 – flap rotates open */
+    .top-flap.open {
+      transform: rotateX(-180deg);
+    }
+
+    /* ─────────────────────────────────────────────
+       BUTTONS
+    ───────────────────────────────────────────── */
+    .buttons {
+      display: flex;
+      gap: 14px;
+    }
+
+    .btn {
+      padding: 9px 28px;
+      background: transparent;
+      border: 1.5px solid #e07878;
+      color: #d06060;
+      font-family: 'Lato', sans-serif;
+      font-size: .72rem;
+      font-weight: 400;
+      letter-spacing: .22em;
+      cursor: pointer;
+      transition: background .2s, color .2s, border-color .2s, transform .1s;
+      min-width: 88px;
+      min-height: 40px;
+    }
+    .btn:hover  { background: #e63946; color: #fff; border-color: #e63946; }
+    .btn:active { transform: scale(.96); }
+
+    /* ─────────────────────────────────────────────
+       RESPONSIVE
+    ───────────────────────────────────────────── */
+    @media (max-width: 340px) {
+      .env-perspective { width: 240px; height: 155px; }
+      .letter   { width: 186px; height: 118px; }
+      .fold-bl  { border-width: 0 0 77px 120px; }
+      .fold-br  { border-width: 0 120px 77px 0; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="particles"></div>
+
+<div class="scene">
+
+  <div class="env-perspective">
+
+    <!--
+      LAYER ORDER (back → front):
+        1. .letter   (DOM first  → behind envelope, opacity 0)
+        2. .envelope (DOM second → covers letter naturally, no z-index needed)
+        3. .top-flap (z-index 10 inside envelope)
+      On .emerge:
+        .letter gets z-index 20 → floats above everything
+    -->
+
+    <!-- 1. Letter — hidden behind envelope on load -->
+    <div class="letter" id="letter">
+      <div class="letter-content">
+        <div class="letter-line"></div>
+        <p class="letter-text">Te quiero,<br>Rayen</p>
+        <div class="letter-decoration">♥ &nbsp;✿&nbsp; ♥</div>
+        <div class="letter-line"></div>
+      </div>
+    </div>
+
+    <!-- 2. Envelope — covers letter in closed state -->
+    <div class="envelope" id="envelope">
+      <div class="env-inside"></div>
+      <div class="fold-bl"></div>
+      <div class="fold-br"></div>
+      <!-- 3. Red flap -->
+      <div class="top-flap" id="topFlap"></div>
+    </div>
+
+  </div>
+
+  <div class="buttons">
+    <button class="btn" id="openBtn">OPEN</button>
+    <button class="btn" id="resetBtn">RESET</button>
+  </div>
+
+</div>
+
+<script>
+  const topFlap     = document.getElementById('topFlap');
+  const letter      = document.getElementById('letter');
+  const openBtn     = document.getElementById('openBtn');
+  const resetBtn    = document.getElementById('resetBtn');
+  const envelope    = document.getElementById('envelope');
+  const particlesEl = document.getElementById('particles');
+
+  /* Must match CSS transition durations */
+  const FLAP_MS   = 880;   /* flap rotation */
+  const LETTER_MS = 950;   /* letter rise   */
+
+  const SYMBOLS = ['❤️','🌸','❤️','✿','♥','🌺','❤️','🌸','♥','✿'];
+  let particleTimer = null;
+  let openTimers    = [];
+  let isOpen        = false;
+
+  function clearOpenTimers() {
+    openTimers.forEach(id => clearTimeout(id));
+    openTimers = [];
+  }
+
+  /* ── 3-phase open sequence ── */
+  function openEnvelope() {
+    if (isOpen) return;
+    isOpen = true;
+
+    /* PHASE 1 – flap rotates open */
+    topFlap.classList.add('open');
+    burstParticles();
+    particleTimer = setInterval(spawnParticle, 290);
+    openTimers.push(setTimeout(() => {
+      if (particleTimer) { clearInterval(particleTimer); particleTimer = null; }
+    }, 5000));
+
+    /* PHASE 2 – letter rises (starts after flap finishes) */
+    openTimers.push(setTimeout(() => {
+      letter.classList.add('emerge');
+    }, FLAP_MS));
+
+    /* PHASE 3 – text fades in (starts after letter finishes rising) */
+    openTimers.push(setTimeout(() => {
+      letter.classList.add('text-visible');
+    }, FLAP_MS + LETTER_MS));
+  }
+
+  /* ── Reset: cancel all timers, restore initial state ── */
+  function closeEnvelope() {
+    isOpen = false;
+    clearOpenTimers();
+    if (particleTimer) { clearInterval(particleTimer); particleTimer = null; }
+
+    topFlap.classList.remove('open');
+    letter.classList.remove('emerge', 'text-visible');
+    /* z-index from .emerge class is removed; DOM order restores natural layering */
+  }
+
+  /* ── Initial burst of particles ── */
+  function burstParticles() {
+    for (let i = 0; i < 14; i++) {
+      openTimers.push(setTimeout(spawnParticle, i * 65));
+    }
+  }
+
+  /* ── Spawn one particle from envelope center ── */
+  function spawnParticle() {
+    const rect = envelope.getBoundingClientRect();
+    const cx   = rect.left + rect.width  / 2;
+    const cy   = rect.top  + rect.height / 2;
+
+    const el = document.createElement('div');
+    el.className = 'particle';
+    el.textContent = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
+
+    const angle = Math.random() * 360;
+    const dist  = 90 + Math.random() * 210;
+    const tx    = Math.cos(angle * Math.PI / 180) * dist;
+    const ty    = Math.sin(angle * Math.PI / 180) * dist - 85;
+    const rot   = (Math.random() - .5) * 220;
+    const dur   = 1.6 + Math.random() * 1.2;
+    const size  = .8 + Math.random() * .95;
+
+    el.style.cssText = `
+      left:${cx}px; top:${cy}px;
+      font-size:${size}rem;
+      animation-duration:${dur}s;
+      --tx:${tx}px; --ty:${ty}px; --rot:${rot}deg;
+    `;
+
+    particlesEl.appendChild(el);
+    setTimeout(() => el.remove(), (dur + .3) * 1000);
+  }
+
+  /* ── Buttons ── */
+  openBtn.addEventListener('click', () => {
+    closeEnvelope();
+    setTimeout(openEnvelope, 80); /* repaint gap before re-opening */
+  });
+  resetBtn.addEventListener('click', closeEnvelope);
+
+  /* ── Auto-open on load ── */
+  setTimeout(openEnvelope, 800);
+</script>
+
+</body>
+</html>
